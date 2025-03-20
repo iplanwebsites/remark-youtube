@@ -1,13 +1,14 @@
 import type { Root, Text, Link } from 'mdast';
 import { visit } from 'unist-util-visit';
 
-const DEFAULT_WIDTH = 560;
+// Default aspect ratio of 16:9
 const DEFAULT_HEIGHT = 315;
 const URL_PATTERN = /^https:\/\/(?:youtu\.be\/|www\.youtube\.com\/watch\?v=)([0-9A-Za-z_-]+)$/;
 
 interface Options {
-  width?: number;
+  width?: string | number;
   height?: number;
+  responsive?: boolean;
 }
 
 const remarkYoutubePlugin = (options?: Options) => (tree: Root) => {
@@ -26,22 +27,33 @@ const remarkYoutubePlugin = (options?: Options) => (tree: Root) => {
         }
       }
     }
-
     if (videoId && videoUrl) {
+      // Set default properties for iframe
+      const iframeProperties: Record<string, any> = {
+        src: `https://www.youtube.com/embed/${videoId}`,
+        frameborder: '0',
+        allow: 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share',
+        allowfullscreen: true,
+      };
+      
+      // Handle responsive option
+      if (options?.responsive !== false) {
+        // Set width to 100% for responsive behavior
+        iframeProperties.width = '100%';
+        iframeProperties.height = options?.height ?? DEFAULT_HEIGHT;
+        iframeProperties.style = 'max-width: 100%;';
+      } else {
+        // Use fixed dimensions if responsive is false
+        iframeProperties.width = options?.width ?? '100%';
+        iframeProperties.height = options?.height ?? DEFAULT_HEIGHT;
+      }
+
       const text: Text = {
         type: 'text',
         value: videoUrl,
         data: {
           hName: 'iframe',
-          hProperties: {
-            width: options?.width ?? DEFAULT_WIDTH,
-            height: options?.height ?? DEFAULT_HEIGHT,
-            src: `https://www.youtube.com/embed/${videoId}`,
-            frameborder: '0',
-            allow:
-              'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share',
-            allowfullscreen: true,
-          },
+          hProperties: iframeProperties,
           hChildren: [],
         },
       };
