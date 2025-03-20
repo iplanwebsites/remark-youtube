@@ -6,6 +6,7 @@ interface Options {
   aspectRatio?: string; // Format: '16:9', '4:3', etc.
   responsive?: boolean;
   className?: string;
+  noHardcodedSize?: boolean; // New option to use youtube-container class
 }
 
 const DEFAULT_ASPECT_RATIO = '16:9';
@@ -73,7 +74,8 @@ const remarkYoutubePlugin = (options: Options = {}) => (tree: Root) => {
   const {
     aspectRatio = DEFAULT_ASPECT_RATIO,
     responsive = true,
-    className = 'youtube-iframe'
+    className = 'youtube-iframe',
+    noHardcodedSize = false
   } = options;
 
   // Extract ratio values
@@ -90,7 +92,25 @@ const remarkYoutubePlugin = (options: Options = {}) => (tree: Root) => {
    * Transform a paragraph into a YouTube embed
    */
   const transformToYoutubeEmbed = (parent: Parent, videoId: string, videoUrl: string) => {
-    if (responsive) {
+    if (noHardcodedSize) {
+      // Use youtube-container class without any styling
+      parent.data = {
+        hName: 'div',
+        hProperties: {
+          className: 'youtube-container'
+        }
+      };
+
+      // Create iframe without style properties
+      const iframeNode = createIframeNode(videoId, videoUrl, {
+        className,
+        responsive: true,
+        // No style specified - will be controlled by external CSS
+      });
+
+      // Replace all children with the iframe
+      parent.children = [iframeNode];
+    } else if (responsive) {
       // Create a wrapper with proper aspect ratio
       parent.data = {
         hName: 'div',
