@@ -43,40 +43,26 @@ const createIframeNode = (
 ): PhrasingContent => {
   const { className, responsive, style } = options;
   
-  if (responsive) {
-    return {
-      type: 'text',
-      value: videoUrl,
-      data: {
-        hName: 'iframe',
-        hProperties: {
-          className,
-          src: `https://www.youtube.com/embed/${videoId}`,
-          frameBorder: '0',
-          allow: 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share',
-          allowFullScreen: true,
-          style
-        }
-      }
-    };
-  } else {
-    return {
-      type: 'text',
-      value: videoUrl,
-      data: {
-        hName: 'iframe',
-        hProperties: {
-          className,
-          src: `https://www.youtube.com/embed/${videoId}`,
-          width: options.width,
-          height: options.height,
-          frameBorder: '0',
-          allow: 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share',
-          allowFullScreen: true
-        }
-      }
-    };
-  }
+  const commonProps = {
+    className,
+    src: `https://www.youtube.com/embed/${videoId}`,
+    frameBorder: '0',
+    allow: 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share',
+    allowFullScreen: true
+  };
+  
+  const hProperties = responsive 
+    ? { ...commonProps, style }
+    : { ...commonProps, width: options.width, height: options.height };
+
+  return {
+    type: 'text',
+    value: videoUrl,
+    data: {
+      hName: 'iframe',
+      hProperties
+    }
+  };
 };
 
 /**
@@ -100,6 +86,44 @@ const remarkYoutubePlugin = (options: Options = {}) => (tree: Root) => {
     ? Math.round(fixedWidth * (height / width)) 
     : Math.round(parseInt(fixedWidth as string, 10) * (height / width));
 
+  /**
+   * Transform a paragraph into a YouTube embed
+   */
+  const transformToYoutubeEmbed = (parent: Parent, videoId: string, videoUrl: string) => {
+    if (responsive) {
+      // Create a wrapper with proper aspect ratio
+      parent.data = {
+        hName: 'div',
+        hProperties: {
+          className: 'youtube-wrapper',
+          style: `position: relative; width: 100%; padding-bottom: ${ratio}%; height: 0; overflow: hidden;`
+        }
+      };
+
+      // Create iframe with absolute positioning
+      const iframeNode = createIframeNode(videoId, videoUrl, {
+        className,
+        responsive: true,
+        style: 'position: absolute; top: 0; left: 0; width: 100%; height: 100%;'
+      });
+
+      // Replace all children with the iframe
+      parent.children = [iframeNode];
+    } else {
+      // Create iframe with fixed dimensions
+      const iframeNode = createIframeNode(videoId, videoUrl, {
+        className,
+        responsive: false,
+        width: fixedWidth,
+        height: fixedHeight
+      });
+
+      // Replace all children with the iframe
+      parent.children = [iframeNode];
+    }
+  };
+
+  // Process text nodes for YouTube URLs
   visit(tree, 'text', (node, index, parent) => {
     if (!parent || parent.type !== 'paragraph') return;
     
@@ -111,40 +135,10 @@ const remarkYoutubePlugin = (options: Options = {}) => (tree: Root) => {
     const videoUrl = node.value.trim();
     
     // Transform the paragraph into a YouTube embed
-    if (responsive) {
-      // Create a wrapper with proper aspect ratio
-      parent.data = {
-        hName: 'div',
-        hProperties: {
-          className: 'youtube-wrapper',
-          style: `position: relative; width: 100%; padding-bottom: ${ratio}%; height: 0; overflow: hidden;`
-        }
-      };
-
-      // Create iframe with absolute positioning
-      const iframeNode = createIframeNode(videoId, videoUrl, {
-        className,
-        responsive: true,
-        style: 'position: absolute; top: 0; left: 0; width: 100%; height: 100%;'
-      });
-
-      // Replace all children with the iframe
-      parent.children = [iframeNode];
-    } else {
-      // Create iframe with fixed dimensions
-      const iframeNode = createIframeNode(videoId, videoUrl, {
-        className,
-        responsive: false,
-        width: fixedWidth,
-        height: fixedHeight
-      });
-
-      // Replace all children with the iframe
-      parent.children = [iframeNode];
-    }
+    transformToYoutubeEmbed(parent, videoId, videoUrl);
   });
 
-  // Also handle link nodes
+  // Process link nodes for YouTube URLs
   visit(tree, 'link', (node, index, parent) => {
     if (!parent || parent.type !== 'paragraph') return;
     
@@ -156,37 +150,7 @@ const remarkYoutubePlugin = (options: Options = {}) => (tree: Root) => {
     const videoUrl = node.url;
     
     // Transform the paragraph into a YouTube embed
-    if (responsive) {
-      // Create a wrapper with proper aspect ratio
-      parent.data = {
-        hName: 'div',
-        hProperties: {
-          className: 'youtube-wrapper',
-          style: `position: relative; width: 100%; padding-bottom: ${ratio}%; height: 0; overflow: hidden;`
-        }
-      };
-
-      // Create iframe with absolute positioning
-      const iframeNode = createIframeNode(videoId, videoUrl, {
-        className,
-        responsive: true,
-        style: 'position: absolute; top: 0; left: 0; width: 100%; height: 100%;'
-      });
-
-      // Replace all children with the iframe
-      parent.children = [iframeNode];
-    } else {
-      // Create iframe with fixed dimensions
-      const iframeNode = createIframeNode(videoId, videoUrl, {
-        className,
-        responsive: false,
-        width: fixedWidth,
-        height: fixedHeight
-      });
-
-      // Replace all children with the iframe
-      parent.children = [iframeNode];
-    }
+    transformToYoutubeEmbed(parent, videoId, videoUrl);
   });
 };
 
